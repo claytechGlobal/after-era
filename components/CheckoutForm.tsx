@@ -5,8 +5,8 @@ import { formatPrice } from "@/lib/products";
 import { useCart } from "./CartProvider";
 
 export function CheckoutForm() {
-  const { items, subtotal, clear } = useCart();
-  const [status, setStatus] = useState<"idle" | "loading" | "disabled" | "error">("idle");
+  const { items, subtotal } = useCart();
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState("");
 
   const shipping = subtotal >= 7500 || subtotal === 0 ? 0 : 695;
@@ -23,6 +23,7 @@ export function CheckoutForm() {
       lastName: String(form.get("lastName") || ""),
       address: String(form.get("address") || ""),
       city: String(form.get("city") || ""),
+      region: String(form.get("region") || ""),
       zip: String(form.get("zip") || ""),
       country: String(form.get("country") || "US"),
       items
@@ -37,11 +38,6 @@ export function CheckoutForm() {
       window.location.href = data.url;
       return;
     }
-    if (data.code === "PAYMENTS_DISABLED") {
-      setStatus("disabled");
-      setMessage("Checkout is ready. Payments will go live as soon as Stripe is connected.");
-      return;
-    }
     setStatus("error");
     setMessage(data.message || "Could not start checkout.");
   }
@@ -49,7 +45,7 @@ export function CheckoutForm() {
   if (!items.length) {
     return (
       <div className="py-20 text-center">
-        <p className="font-head font-extrabold tracking-tr1 uppercase mb-3">Your bag is empty</p>
+        <p className="font-display text-3xl mb-3">Your bag is empty</p>
         <a href="/shop" className="btn btn-primary">Continue shopping</a>
       </div>
     );
@@ -65,8 +61,9 @@ export function CheckoutForm() {
           <input required type="email" name="email" placeholder="Email" className="border border-line px-4 py-3 text-sm sm:col-span-2" />
           <input required name="address" placeholder="Address" className="border border-line px-4 py-3 text-sm sm:col-span-2" />
           <input required name="city" placeholder="City" className="border border-line px-4 py-3 text-sm" />
+          <input required name="region" placeholder="State / Province" className="border border-line px-4 py-3 text-sm" />
           <input required name="zip" placeholder="ZIP" className="border border-line px-4 py-3 text-sm" />
-          <select name="country" className="border border-line px-4 py-3 text-sm sm:col-span-2" defaultValue="US">
+          <select name="country" className="border border-line px-4 py-3 text-sm" defaultValue="US">
             <option value="US">United States</option>
             <option value="CA">Canada</option>
           </select>
@@ -74,13 +71,11 @@ export function CheckoutForm() {
         <h2 className="font-head font-bold text-sm tracking-tr1 uppercase mb-4">Payment</h2>
         <div className="border border-line p-5 mb-6 bg-stone">
           <p className="font-head text-xs tracking-tr1 uppercase mb-2">Secure checkout via Stripe</p>
-          <p className="text-sm text-ink/65">
-            Card payments, Apple Pay, and Google Pay will process through Stripe. Payment is not live yet — the flow is in place and will activate when Stripe keys are added.
-          </p>
+          <p className="text-sm text-ink/65">You will pay on Stripe. Card details never touch this website.</p>
         </div>
         {message ? <p className="text-sm mb-4">{message}</p> : null}
         <button className="btn btn-primary" disabled={status === "loading"}>
-          {status === "loading" ? "Connecting…" : status === "disabled" ? "Payments coming soon" : "Continue to payment"}
+          {status === "loading" ? "Redirecting…" : "Continue to payment"}
         </button>
       </div>
       <aside className="bg-stone p-6 h-fit">
@@ -98,9 +93,6 @@ export function CheckoutForm() {
           <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? "Free" : formatPrice(shipping)}</span></div>
           <div className="flex justify-between font-bold text-base pt-2 border-t border-line"><span>Total</span><span>{formatPrice(total)}</span></div>
         </div>
-        {status === "disabled" ? (
-          <button type="button" onClick={() => clear()} className="mt-6 text-xs tracking-tr1 uppercase underline">Clear bag</button>
-        ) : null}
       </aside>
     </form>
   );

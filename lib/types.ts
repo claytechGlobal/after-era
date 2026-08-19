@@ -48,6 +48,7 @@ export type CheckoutPayload = {
   lastName: string;
   address: string;
   city: string;
+  region: string;
   zip: string;
   country: string;
   items: CartItem[];

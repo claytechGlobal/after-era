@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createStripeCheckoutSession } from "@/lib/payments";
 import type { CheckoutPayload } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const payload = (await req.json()) as CheckoutPayload;
   if (!payload?.email || !payload.items?.length) {
