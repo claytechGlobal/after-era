@@ -1,4 +1,4 @@
-import { fetchPrintifyProduct, fetchPrintifyProducts } from "./printify";
+import { fetchPrintifyProduct, fetchPrintifyProducts, printifyConfigured } from "./printify";
 import type { ProductCategory, StoreProduct } from "./types";
 
 const fallback: StoreProduct[] = [
@@ -66,7 +66,7 @@ const fallback: StoreProduct[] = [
 ];
 
 export async function getProducts(): Promise<StoreProduct[]> {
-  if (process.env.PRINTIFY_API_TOKEN) {
+  if (printifyConfigured()) {
     try {
       const live = await fetchPrintifyProducts();
       return live || [];
@@ -78,7 +78,7 @@ export async function getProducts(): Promise<StoreProduct[]> {
 }
 
 export async function getProduct(id: string): Promise<StoreProduct | null> {
-  if (process.env.PRINTIFY_API_TOKEN) {
+  if (printifyConfigured()) {
     try {
       const live = await fetchPrintifyProduct(id);
       if (live) return live;
