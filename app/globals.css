@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0e0d0c;
+  --paper: #f7f3ec;
+  --stone: #efe8dc;
+  --line: #ddd4c6;
+  --gold: #c6a15a;
+  --gold-deep: #8a6a2c;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--gold);
+  color: #fff;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  padding: 1rem 1.85rem;
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-primary:hover {
+  background: var(--gold-deep);
+}
+
+.btn-line {
+  border: 1px solid currentColor;
+}
+
+.btn-line:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+input,
+textarea,
+select {
+  background: #fff;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 1px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.prod-img {
+  transition: transform 0.8s ease;
+}
+
+.card:hover .prod-img {
+  transform: scale(1.06);
+}
+
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+.marquee {
+  display: flex;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-track {
+  display: flex;
+  gap: 3rem;
+  animation: marquee 28s linear infinite;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
