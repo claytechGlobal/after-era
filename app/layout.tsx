@@ -10,6 +10,8 @@ const archivo = Archivo({ subsets: ["latin"], weight: ["500", "600", "700", "800
 const cormorant = Cormorant_Garamond({ subsets: ["latin"], weight: ["500", "600", "700"], style: ["normal", "italic"], variable: "--font-cormorant" });
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-inter" });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "A.F.T.E.R. ERA",
   description: "Wear your rise. Premium made-to-order fashion from A.F.T.E.R. ERA.",

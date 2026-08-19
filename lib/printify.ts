@@ -32,6 +32,10 @@ export async function getShopId(): Promise<string | null> {
   if (process.env.PRINTIFY_SHOP_ID) return process.env.PRINTIFY_SHOP_ID;
   const shops = await printifyFetch("/shops.json");
   if (!Array.isArray(shops) || shops.length === 0) return null;
+  for (const shop of shops) {
+    const data = await printifyFetch(`/shops/${shop.id}/products.json?limit=1`);
+    if ((data?.data || []).length) return String(shop.id);
+  }
   const named = shops.find((s: { title?: string }) =>
     String(s.title || "").toLowerCase().includes("after")
   );
@@ -72,8 +76,9 @@ function mapProduct(p: PrintifyProduct): StoreProduct {
   const optionIndex = (p.options || []).map((opt) =>
     Object.fromEntries((opt.values || []).map((v) => [v.id, { name: opt.name, title: v.title }]))
   );
-  const variants = (p.variants || [])
-    .filter((v) => v.is_enabled)
+  const enabled = (p.variants || []).filter((v) => v.is_enabled);
+  const source = enabled.length ? enabled : p.variants || [];
+  const variants = source
     .map((v) => {
       const mapped: Record<string, string> = {};
       (v.options || []).forEach((optId, i) => {
@@ -123,7 +128,7 @@ export async function fetchPrintifyProducts(): Promise<StoreProduct[] | null> {
     if (list.length < 50) break;
     page += 1;
   }
-  return all.filter((p) => p.visible !== false).map(mapProduct);
+  return all.map(mapProduct);
 }
 
 export async function fetchPrintifyProduct(id: string): Promise<StoreProduct | null> {

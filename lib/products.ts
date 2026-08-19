@@ -66,20 +66,27 @@ const fallback: StoreProduct[] = [
 ];
 
 export async function getProducts(): Promise<StoreProduct[]> {
-  try {
-    const live = await fetchPrintifyProducts();
-    if (live && live.length) return live;
-  } catch {}
+  if (process.env.PRINTIFY_API_TOKEN) {
+    try {
+      const live = await fetchPrintifyProducts();
+      return live || [];
+    } catch {
+      return [];
+    }
+  }
   return fallback;
 }
 
 export async function getProduct(id: string): Promise<StoreProduct | null> {
-  try {
-    const live = await fetchPrintifyProduct(id);
-    if (live) return live;
-  } catch {}
-  const products = await getProducts();
-  return products.find((p) => p.id === id) || fallback.find((p) => p.id === id) || null;
+  if (process.env.PRINTIFY_API_TOKEN) {
+    try {
+      const live = await fetchPrintifyProduct(id);
+      if (live) return live;
+    } catch {}
+    const products = await getProducts();
+    return products.find((p) => p.id === id) || null;
+  }
+  return fallback.find((p) => p.id === id) || null;
 }
 
 export function filterByCategory(products: StoreProduct[], category?: string) {
