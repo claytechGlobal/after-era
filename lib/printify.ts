@@ -4,6 +4,7 @@ import type { StoreProduct } from "./types";
 const PRINTIFY_API = "https://api.printify.com/v1";
 
 let lastError = "";
+let lastShops: { id: string; title: string }[] = [];
 
 function token() {
   return (process.env.PRINTIFY_API_TOKEN || "").replace(/\s+/g, "").replace(/^["']+|["']+$/g, "");
@@ -18,7 +19,7 @@ export function printifyConfigured() {
 }
 
 export function printifyDebug() {
-  return { configured: printifyConfigured(), tokenLength: token().length, lastError };
+  return { configured: printifyConfigured(), tokenLength: token().length, lastError, shops: lastShops };
 }
 
 async function printifyFetch(path: string) {
@@ -37,10 +38,17 @@ async function printifyFetch(path: string) {
   });
   if (!res.ok) {
     lastError = `HTTP_${res.status}`;
-    throw new Error(lastError);
+    return null;
   }
-  lastError = "";
   return res.json();
+}
+
+function asShops(raw: unknown) {
+  if (Array.isArray(raw)) return raw as { id: number | string; title?: string }[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)) {
+    return (raw as { data: { id: number | string; title?: string }[] }).data;
+  }
+  return [];
 }
 
 type PrintifyVariant = {
@@ -117,35 +125,34 @@ function mapProduct(p: PrintifyProduct): StoreProduct {
 
 async function productsForShop(id: string) {
   const data = await printifyFetch(`/shops/${id}/products.json?limit=50`);
-  return (data?.data || []) as PrintifyProduct[];
+  if (!data) return [];
+  if (Array.isArray(data)) return data as PrintifyProduct[];
+  return (data.data || []) as PrintifyProduct[];
+}
+
+async function listShops() {
+  const raw = await printifyFetch("/shops.json");
+  const shops = asShops(raw);
+  lastShops = shops.map((s) => ({ id: String(s.id), title: s.title || "" }));
+  return shops;
 }
 
 export async function getShopId(): Promise<string | null> {
   if (shopIdEnv()) return shopIdEnv();
-  const shops = await printifyFetch("/shops.json");
-  if (!Array.isArray(shops) || shops.length === 0) {
+  const shops = await listShops();
+  if (!shops.length) {
     lastError = lastError || "NO_SHOPS";
     return null;
   }
-  const named = shops.find((s: { title?: string }) =>
-    String(s.title || "").toLowerCase().includes("after")
-  );
+  const named = shops.find((s) => String(s.title || "").toLowerCase().includes("after"));
   return String((named || shops[0]).id);
 }
 
 export async function fetchPrintifyProducts(): Promise<StoreProduct[] | null> {
   if (!token()) return null;
-  const forced = shopIdEnv();
-  if (forced) {
-    const list = await productsForShop(forced);
-    return list.map(mapProduct);
-  }
-  const shops = await printifyFetch("/shops.json");
-  if (!Array.isArray(shops) || shops.length === 0) {
-    lastError = lastError || "NO_SHOPS";
-    return [];
-  }
-  const lists = await Promise.all(shops.map((s: { id: number }) => productsForShop(String(s.id))));
+  const shops = await listShops();
+  const ids = shopIdEnv() ? [shopIdEnv()] : shops.map((s) => String(s.id));
+  const lists = await Promise.all(ids.map((id) => productsForShop(id)));
   const seen = new Set<string>();
   const all: PrintifyProduct[] = [];
   lists.flat().forEach((p) => {
@@ -153,19 +160,26 @@ export async function fetchPrintifyProducts(): Promise<StoreProduct[] | null> {
     seen.add(p.id);
     all.push(p);
   });
+  if (all.length) lastError = "";
+  if (!all.length && shopIdEnv() && shops.length) {
+    const fallbackLists = await Promise.all(shops.map((s) => productsForShop(String(s.id))));
+    fallbackLists.flat().forEach((p) => {
+      if (!p?.id || seen.has(p.id)) return;
+      seen.add(p.id);
+      all.push(p);
+    });
+    if (all.length) lastError = "";
+  }
   return all.map(mapProduct);
 }
 
 export async function fetchPrintifyProduct(id: string): Promise<StoreProduct | null> {
   if (!token()) return null;
-  const shops = shopIdEnv()
-    ? [{ id: shopIdEnv() }]
-    : ((await printifyFetch("/shops.json")) as { id: number }[] | null) || [];
-  for (const shop of shops) {
-    try {
-      const data = await printifyFetch(`/shops/${shop.id}/products/${id}.json`);
-      if (data?.id) return mapProduct(data as PrintifyProduct);
-    } catch {}
+  const shops = await listShops();
+  const ids = shopIdEnv() ? [shopIdEnv(), ...shops.map((s) => String(s.id))] : shops.map((s) => String(s.id));
+  for (const shop of ids) {
+    const data = await printifyFetch(`/shops/${shop}/products/${id}.json`);
+    if (data?.id) return mapProduct(data as PrintifyProduct);
   }
   return null;
 }
