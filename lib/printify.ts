@@ -136,7 +136,7 @@ function mapProduct(p: PrintifyProduct): StoreProduct {
     }))
     .filter((img) => img.src);
   if (images.length === 0) {
-    images.push({ src: "/hoodie.png", alt: p.title });
+    images.push({ src: "/hoodie.png", alt: p.title, variantIds: [] });
   }
   return {
     id: p.id,
