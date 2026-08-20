@@ -18,9 +18,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true, skipped: true });
     }
     const meta = session?.metadata || {};
-    let items: { productId: string; variantId: string; quantity: number }[] = [];
+    let rawItems = meta.items || "";
+    if (meta.itemParts) {
+      rawItems = Array.from({ length: Number(meta.itemParts) }, (_, i) => meta[`items_${i}`] || "").join("");
+    }
+    let items: { productId: string; variantId: string; shopId?: string; quantity: number }[] = [];
     try {
-      items = JSON.parse(meta.items || "[]");
+      items = JSON.parse(rawItems || "[]");
     } catch {
       items = [];
     }
@@ -35,9 +39,11 @@ export async function POST(req: Request) {
           region: meta.region || "",
           zip: meta.zip || "",
           country: meta.country || "US",
+          phone: meta.phone || "",
           items: items.map((i) => ({
             productId: i.productId,
             variantId: i.variantId,
+            shopId: i.shopId,
             title: "",
             variantTitle: "",
             image: "",

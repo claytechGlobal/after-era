@@ -37,16 +37,22 @@ export async function createStripeCheckoutSession(payload: CheckoutPayload) {
   body.set("metadata[region]", payload.region || "");
   body.set("metadata[zip]", payload.zip);
   body.set("metadata[country]", payload.country);
-  body.set(
-    "metadata[items]",
-    JSON.stringify(
-      payload.items.map((i) => ({
-        productId: i.productId,
-        variantId: i.variantId,
-        quantity: i.quantity
-      }))
-    )
+  body.set("metadata[phone]", payload.phone || "");
+  const packed = JSON.stringify(
+    payload.items.map((i) => ({
+      productId: i.productId,
+      variantId: i.variantId,
+      shopId: i.shopId || "",
+      quantity: i.quantity
+    }))
   );
+  if (packed.length <= 450) {
+    body.set("metadata[items]", packed);
+  } else {
+    const parts = packed.match(/.{1,450}/g) || [];
+    parts.forEach((part, i) => body.set(`metadata[items_${i}]`, part));
+    body.set("metadata[itemParts]", String(parts.length));
+  }
   payload.items.forEach((item, index) => {
     body.set(`line_items[${index}][quantity]`, String(item.quantity));
     body.set(`line_items[${index}][price_data][currency]`, "usd");

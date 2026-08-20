@@ -58,7 +58,7 @@ type PrintifyVariant = {
   price: number;
   is_enabled: boolean;
   is_available: boolean;
-  options: number[];
+  options: number[] | Record<string, string>;
 };
 
 type PrintifyProduct = {
@@ -80,19 +80,44 @@ function stripHtml(html: string) {
 function mapProduct(p: PrintifyProduct): StoreProduct {
   const options = (p.options || []).map((opt) => ({
     name: opt.name,
-    values: (opt.values || []).map((v) => v.title)
+    values: Array.from(new Set((opt.values || []).map((v) => v.title)))
   }));
-  const optionIndex = (p.options || []).map((opt) =>
-    Object.fromEntries((opt.values || []).map((v) => [v.id, { name: opt.name, title: v.title }]))
-  );
+  const valueMap: Record<string, { name: string; title: string }> = {};
+  (p.options || []).forEach((opt) => {
+    (opt.values || []).forEach((val) => {
+      valueMap[String(val.id)] = { name: opt.name, title: val.title };
+    });
+  });
   const enabled = (p.variants || []).filter((v) => v.is_enabled);
   const source = enabled.length ? enabled : p.variants || [];
   const variants = source.map((v) => {
     const mapped: Record<string, string> = {};
-    (v.options || []).forEach((optId, i) => {
-      const found = optionIndex[i]?.[optId];
-      if (found) mapped[found.name] = found.title;
-    });
+    if (Array.isArray(v.options)) {
+      v.options.forEach((optId) => {
+        const found = valueMap[String(optId)];
+        if (found) mapped[found.name] = found.title;
+      });
+    } else if (v.options && typeof v.options === "object") {
+      Object.entries(v.options).forEach(([key, val]) => {
+        const opt = options.find(
+          (o) =>
+            o.name.toLowerCase() === key.toLowerCase() ||
+            o.name.toLowerCase().replace(/s$/, "") === key.toLowerCase().replace(/s$/, "")
+        );
+        mapped[opt?.name || key] = String(val);
+      });
+    }
+    if (v.title) {
+      const parts = v.title.split("/").map((part) => part.trim());
+      options.forEach((opt, i) => {
+        if (mapped[opt.name]) return;
+        const part = parts[i] || "";
+        const match =
+          opt.values.find((val) => val.toLowerCase() === part.toLowerCase()) ||
+          opt.values.find((val) => part.toLowerCase() === val.toLowerCase());
+        if (match) mapped[opt.name] = match;
+      });
+    }
     return {
       id: String(v.id),
       title: v.title,
@@ -104,7 +129,11 @@ function mapProduct(p: PrintifyProduct): StoreProduct {
   });
   const prices = variants.map((v) => v.price).filter((n) => n > 0);
   const images = (p.images || [])
-    .map((img) => ({ src: img.src, alt: p.title }))
+    .map((img) => ({
+      src: img.src,
+      alt: p.title,
+      variantIds: (img.variant_ids || []).map(String)
+    }))
     .filter((img) => img.src);
   if (images.length === 0) {
     images.push({ src: "/hoodie.png", alt: p.title });
@@ -119,7 +148,8 @@ function mapProduct(p: PrintifyProduct): StoreProduct {
     options,
     variants,
     tags: p.tags || [],
-    createdAt: p.created_at
+    createdAt: p.created_at,
+    shopId: ""
   };
 }
 
@@ -154,23 +184,31 @@ export async function fetchPrintifyProducts(): Promise<StoreProduct[] | null> {
   const ids = shopIdEnv() ? [shopIdEnv()] : shops.map((s) => String(s.id));
   const lists = await Promise.all(ids.map((id) => productsForShop(id)));
   const seen = new Set<string>();
-  const all: PrintifyProduct[] = [];
-  lists.flat().forEach((p) => {
-    if (!p?.id || seen.has(p.id)) return;
-    seen.add(p.id);
-    all.push(p);
-  });
-  if (all.length) lastError = "";
-  if (!all.length && shopIdEnv() && shops.length) {
-    const fallbackLists = await Promise.all(shops.map((s) => productsForShop(String(s.id))));
-    fallbackLists.flat().forEach((p) => {
+  const mapped: StoreProduct[] = [];
+  lists.forEach((list, i) => {
+    list.forEach((p) => {
       if (!p?.id || seen.has(p.id)) return;
       seen.add(p.id);
-      all.push(p);
+      const product = mapProduct(p);
+      product.shopId = ids[i];
+      mapped.push(product);
     });
-    if (all.length) lastError = "";
+  });
+  if (mapped.length) lastError = "";
+  if (!mapped.length && shopIdEnv() && shops.length) {
+    const extra = await Promise.all(shops.map((s) => productsForShop(String(s.id))));
+    extra.forEach((list, i) => {
+      list.forEach((p) => {
+        if (!p?.id || seen.has(p.id)) return;
+        seen.add(p.id);
+        const product = mapProduct(p);
+        product.shopId = String(shops[i].id);
+        mapped.push(product);
+      });
+    });
+    if (mapped.length) lastError = "";
   }
-  return all.map(mapProduct);
+  return mapped;
 }
 
 export async function fetchPrintifyProduct(id: string): Promise<StoreProduct | null> {
@@ -179,7 +217,17 @@ export async function fetchPrintifyProduct(id: string): Promise<StoreProduct | n
   const ids = shopIdEnv() ? [shopIdEnv(), ...shops.map((s) => String(s.id))] : shops.map((s) => String(s.id));
   for (const shop of ids) {
     const data = await printifyFetch(`/shops/${shop}/products/${id}.json`);
-    if (data?.id) return mapProduct(data as PrintifyProduct);
+    if (data?.id) {
+      const product = mapProduct(data as PrintifyProduct);
+      product.shopId = String(shop);
+      return product;
+    }
   }
   return null;
+}
+
+export async function allShopIds() {
+  const shops = await listShops();
+  const forced = shopIdEnv();
+  return forced ? [forced, ...shops.map((s) => String(s.id))] : shops.map((s) => String(s.id));
 }

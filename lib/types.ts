@@ -3,6 +3,7 @@ export type ProductCategory = "tops" | "bottoms" | "coordinate" | "accessories";
 export type ProductImage = {
   src: string;
   alt: string;
+  variantIds?: string[];
 };
 
 export type ProductOption = {
@@ -30,11 +31,13 @@ export type StoreProduct = {
   variants: ProductVariant[];
   tags: string[];
   createdAt?: string;
+  shopId?: string;
 };
 
 export type CartItem = {
   productId: string;
   variantId: string;
+  shopId?: string;
   title: string;
   variantTitle: string;
   image: string;
@@ -51,5 +54,6 @@ export type CheckoutPayload = {
   region: string;
   zip: string;
   country: string;
+  phone: string;
   items: CartItem[];
 };

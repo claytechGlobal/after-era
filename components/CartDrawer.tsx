@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { formatPrice } from "@/lib/products";
-import { useCart } from "./CartProvider";
+import { lineKey, useCart } from "./CartProvider";
 
 export function CartDrawer() {
   const { items, open, setOpen, remove, setQty, subtotal } = useCart();
@@ -24,7 +24,7 @@ export function CartDrawer() {
             </div>
           ) : (
             items.map((item) => (
-              <div key={item.variantId} className="flex gap-4">
+              <div key={lineKey(item)} className="flex gap-4">
                 <div className="w-20 h-24 bg-stone overflow-hidden shrink-0">
                   <img src={item.image || "/hoodie.png"} alt="" className="w-full h-full object-contain p-1" />
                 </div>
@@ -33,10 +33,10 @@ export function CartDrawer() {
                   <p className="text-xs text-ink/45 mt-1">{item.variantTitle}</p>
                   <p className="text-sm mt-1">{formatPrice(item.price)}</p>
                   <div className="flex items-center gap-3 mt-3">
-                    <button onClick={() => setQty(item.variantId, item.quantity - 1)} className="w-7 h-7 border border-line">-</button>
+                    <button onClick={() => setQty(lineKey(item), item.quantity - 1)} className="w-7 h-7 border border-line">-</button>
                     <span className="text-sm w-4 text-center">{item.quantity}</span>
-                    <button onClick={() => setQty(item.variantId, item.quantity + 1)} className="w-7 h-7 border border-line">+</button>
-                    <button onClick={() => remove(item.variantId)} className="ml-auto text-[10px] uppercase tracking-tr1 text-ink/40">Remove</button>
+                    <button onClick={() => setQty(lineKey(item), item.quantity + 1)} className="w-7 h-7 border border-line">+</button>
+                    <button onClick={() => remove(lineKey(item))} className="ml-auto text-[10px] uppercase tracking-tr1 text-ink/40">Remove</button>
                   </div>
                 </div>
               </div>

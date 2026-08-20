@@ -3,11 +3,15 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { CartItem } from "@/lib/types";
 
+export function lineKey(item: { productId: string; variantId: string }) {
+  return `${item.productId}::${item.variantId}`;
+}
+
 type CartContextValue = {
   items: CartItem[];
   add: (item: CartItem) => void;
-  remove: (variantId: string) => void;
-  setQty: (variantId: string, quantity: number) => void;
+  remove: (key: string) => void;
+  setQty: (key: string, quantity: number) => void;
   clear: () => void;
   count: number;
   subtotal: number;
@@ -16,7 +20,7 @@ type CartContextValue = {
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
-const KEY = "after-era-cart";
+const KEY = "after-era-cart-v2";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -39,20 +43,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<CartContextValue>(() => {
     const add = (item: CartItem) => {
       setItems((prev) => {
-        const found = prev.find((p) => p.variantId === item.variantId);
+        const key = lineKey(item);
+        const found = prev.find((p) => lineKey(p) === key);
         if (found) {
-          return prev.map((p) =>
-            p.variantId === item.variantId ? { ...p, quantity: p.quantity + item.quantity } : p
-          );
+          return prev.map((p) => (lineKey(p) === key ? { ...item, quantity: p.quantity + item.quantity } : p));
         }
         return [...prev, item];
       });
       setOpen(true);
     };
-    const remove = (variantId: string) => setItems((prev) => prev.filter((p) => p.variantId !== variantId));
-    const setQty = (variantId: string, quantity: number) => {
-      if (quantity < 1) return remove(variantId);
-      setItems((prev) => prev.map((p) => (p.variantId === variantId ? { ...p, quantity } : p)));
+    const remove = (key: string) => setItems((prev) => prev.filter((p) => lineKey(p) !== key));
+    const setQty = (key: string, quantity: number) => {
+      if (quantity < 1) return remove(key);
+      setItems((prev) => prev.map((p) => (lineKey(p) === key ? { ...p, quantity } : p)));
     };
     const clear = () => setItems([]);
     return {

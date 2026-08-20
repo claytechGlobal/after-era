@@ -26,6 +26,7 @@ export function CheckoutForm() {
       region: String(form.get("region") || ""),
       zip: String(form.get("zip") || ""),
       country: String(form.get("country") || "US"),
+      phone: String(form.get("phone") || ""),
       items
     };
     const res = await fetch("/api/checkout", {
@@ -63,7 +64,8 @@ export function CheckoutForm() {
           <input required name="city" placeholder="City" className="border border-line px-4 py-3 text-sm" />
           <input required name="region" placeholder="State / Province" className="border border-line px-4 py-3 text-sm" />
           <input required name="zip" placeholder="ZIP" className="border border-line px-4 py-3 text-sm" />
-          <select name="country" className="border border-line px-4 py-3 text-sm" defaultValue="US">
+          <input required name="phone" placeholder="Phone" className="border border-line px-4 py-3 text-sm" />
+          <select name="country" className="border border-line px-4 py-3 text-sm sm:col-span-2" defaultValue="US">
             <option value="US">United States</option>
             <option value="CA">Canada</option>
           </select>
@@ -82,8 +84,11 @@ export function CheckoutForm() {
         <h3 className="font-head font-bold text-sm tracking-tr1 uppercase mb-4">Order summary</h3>
         <div className="space-y-3 text-sm mb-4">
           {items.map((item) => (
-            <div key={item.variantId} className="flex justify-between gap-4">
-              <span>{item.title} × {item.quantity}</span>
+            <div key={`${item.productId}::${item.variantId}`} className="flex justify-between gap-4">
+              <span>
+                {item.title}
+                {item.variantTitle ? ` — ${item.variantTitle}` : ""} × {item.quantity}
+              </span>
               <span>{formatPrice(item.price * item.quantity)}</span>
             </div>
           ))}

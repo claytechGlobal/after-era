@@ -1,16 +1,13 @@
-import { getShopId } from "./printify";
-import type { CheckoutPayload } from "./types";
+import { allShopIds, getShopId } from "./printify";
+import type { CartItem, CheckoutPayload } from "./types";
 
 function printifyToken() {
   return (process.env.PRINTIFY_API_TOKEN || "").replace(/\s+/g, "").replace(/^["']+|["']+$/g, "");
 }
 
-export async function createPrintifyOrder(payload: CheckoutPayload, externalId?: string) {
+async function postOrder(shopId: string, payload: CheckoutPayload, items: CartItem[], externalId?: string) {
   const token = printifyToken();
-  if (!token) return { ok: false as const, code: "PRINTIFY_NOT_CONFIGURED" };
-  const shopId = await getShopId();
-  if (!shopId) return { ok: false as const, code: "NO_SHOP" };
-  const line_items = payload.items
+  const line_items = items
     .map((item) => ({
       product_id: item.productId,
       variant_id: Number(item.variantId),
@@ -27,7 +24,7 @@ export async function createPrintifyOrder(payload: CheckoutPayload, externalId?:
       first_name: payload.firstName,
       last_name: payload.lastName,
       email: payload.email,
-      phone: "",
+      phone: payload.phone || "0000000000",
       country: payload.country || "US",
       region: payload.region || "",
       address1: payload.address,
@@ -60,4 +57,30 @@ export async function createPrintifyOrder(payload: CheckoutPayload, externalId?:
     });
   }
   return { ok: true as const, data };
+}
+
+export async function createPrintifyOrder(payload: CheckoutPayload, externalId?: string) {
+  const token = printifyToken();
+  if (!token) return { ok: false as const, code: "PRINTIFY_NOT_CONFIGURED" };
+  const groups = new Map<string, CartItem[]>();
+  payload.items.forEach((item) => {
+    const key = item.shopId || "_";
+    groups.set(key, [...(groups.get(key) || []), item]);
+  });
+  const fallback = (await allShopIds()).concat((await getShopId()) || []);
+  let any = false;
+  for (const [shopKey, items] of groups) {
+    const candidates = shopKey !== "_" ? [shopKey, ...fallback] : fallback;
+    let placed = false;
+    for (const shopId of [...new Set(candidates.filter(Boolean))]) {
+      const result = await postOrder(shopId, payload, items, externalId);
+      if (result.ok) {
+        placed = true;
+        any = true;
+        break;
+      }
+    }
+    if (!placed) return { ok: false as const, code: "PRINTIFY_ORDER_FAILED" };
+  }
+  return any ? { ok: true as const } : { ok: false as const, code: "NO_SHOP" };
 }

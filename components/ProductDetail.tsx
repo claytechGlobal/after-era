@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCart } from "./CartProvider";
 import type { StoreProduct } from "@/lib/types";
 import { displayTitle, formatPrice } from "@/lib/products";
+import { findVariant, imageIndexForVariant, optionAvailable, sameOption, variantHasValue, variantLabel } from "@/lib/variants";
 
 export function ProductDetail({ product }: { product: StoreProduct }) {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
   const [active, setActive] = useState(0);
   const initial = useMemo(() => {
+    const first = product.variants[0];
+    if (first && Object.keys(first.options).length) return { ...first.options };
     const sel: Record<string, string> = {};
     product.options.forEach((opt) => {
       sel[opt.name] = opt.values[0];
@@ -18,12 +21,24 @@ export function ProductDetail({ product }: { product: StoreProduct }) {
   }, [product]);
   const [selected, setSelected] = useState<Record<string, string>>(initial);
 
-  const variant = product.variants.find((v) =>
-    product.options.every((opt) => !selected[opt.name] || v.options[opt.name] === selected[opt.name] || v.title === selected[opt.name])
-  ) || product.variants[0];
-
+  const variant = findVariant(product, selected);
   const price = variant?.price || product.price;
   const img = product.images[active]?.src || product.images[0]?.src || "/hoodie.png";
+
+  useEffect(() => {
+    if (!variant) return;
+    setActive(imageIndexForVariant(product, variant.id));
+  }, [product, variant]);
+
+  function choose(name: string, value: string) {
+    setSelected((current) => {
+      const next = { ...current, [name]: value };
+      if (findVariant(product, next)) return next;
+      const match = product.variants.find((v) => variantHasValue(v, name, value));
+      if (match && Object.keys(match.options).length) return { ...match.options };
+      return next;
+    });
+  }
 
   return (
     <div className="grid lg:grid-cols-2 gap-10 lg:gap-20">
@@ -50,15 +65,19 @@ export function ProductDetail({ product }: { product: StoreProduct }) {
           <div key={opt.name} className="mb-7">
             <p className="font-head text-[10px] tracking-tr1 uppercase mb-3">{opt.name}</p>
             <div className="flex flex-wrap gap-2">
-              {opt.values.map((val) => (
-                <button
-                  key={val}
-                  onClick={() => setSelected((s) => ({ ...s, [opt.name]: val }))}
-                  className={`min-w-11 px-3 py-2 text-[11px] font-head tracking-tr1 uppercase border ${selected[opt.name] === val ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"}`}
-                >
-                  {val}
-                </button>
-              ))}
+              {opt.values.map((val) => {
+                const on = sameOption(selected[opt.name], val);
+                const available = optionAvailable(product, selected, opt.name, val);
+                return (
+                  <button
+                    key={val}
+                    onClick={() => choose(opt.name, val)}
+                    className={`min-w-11 px-3 py-2 text-[11px] font-head tracking-tr1 uppercase border ${on ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"} ${available ? "" : "opacity-35"}`}
+                  >
+                    {val}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -70,22 +89,30 @@ export function ProductDetail({ product }: { product: StoreProduct }) {
         </div>
         <button
           className="btn btn-primary w-full sm:w-auto"
-          disabled={!variant}
+          disabled={!variant || variant.available === false}
           onClick={() => {
             if (!variant) return;
             add({
               productId: product.id,
               variantId: variant.id,
+              shopId: product.shopId,
               title: displayTitle(product.title),
-              variantTitle: variant.title,
+              variantTitle: variantLabel(product, selected, variant.title),
               image: img,
               price: variant.price,
               quantity: qty
             });
           }}
         >
-          Add to bag
+          {variant && variant.available !== false ? "Add to bag" : variant ? "Out of stock" : "Select options"}
         </button>
+          {variant && variant.available !== false ? (
+          <p className="text-xs text-ink/45 mt-3">{variantLabel(product, selected, variant.title)}</p>
+        ) : variant ? (
+          <p className="text-xs text-ink/55 mt-3">This combination is out of stock. Pick another color or size.</p>
+        ) : (
+          <p className="text-xs text-ink/55 mt-3">That color/size mix is not available. Pick another combination.</p>
+        )}
         <div className="gold-rule my-8" />
         <p className="text-xs text-ink/45 leading-relaxed max-w-sm">Made to order. Allow 2–7 days for production. Returns within 14 days for defects or print errors only.</p>
       </div>
